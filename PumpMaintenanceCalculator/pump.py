@@ -192,22 +192,23 @@ def calculate_rul(mtbf_data, rul_factor):
     mtbf_data['RUL (%)'] = mtbf_data['RUL (%)'].round(2)
     return mtbf_data
 
-# Function to upload and process data files
 def upload_and_process_data():
     operating_data = None
     vibration_data = None
     maintenance_data = None
 
-    # File uploads
-    st.sidebar.header('Upload Data Files')
-    operating_file = st.sidebar.file_uploader('Upload Operating Data File (CSV/JSON/XLSX)', type=['csv', 'json', 'xlsx'])
-    vibration_file = st.sidebar.file_uploader('Upload Vibration Data File (CSV/JSON/XLSX)', type=['csv', 'json', 'xlsx'])
-    maintenance_file = st.sidebar.file_uploader('Upload Maintenance History File (CSV/JSON/XLSX)', type=['csv', 'json', 'xlsx'])
-
     # Input for RUL Factor
     rul_factor = st.sidebar.slider('RUL Factor', min_value=0.1, max_value=2.0, value=1.0, step=0.1)
 
- # Check if files are uploaded and load data
+    # Dropdown for PumpID selection
+    with st.sidebar.expander("Upload Data Files"):
+        #st.header('Upload Data Files')
+        operating_file = st.file_uploader('Operating Data ', type=['csv', 'json', 'xlsx'])
+        vibration_file = st.file_uploader('Vibration Data ', type=['csv', 'json', 'xlsx'])
+        maintenance_file = st.file_uploader('Maintenance History ', type=['csv', 'json', 'xlsx'])
+        st.sidebar.markdown(download_sample_data(), unsafe_allow_html=True)
+
+    # File uploads
     if operating_file is not None:
         try:
             if operating_file.type == 'application/vnd.ms-excel' or operating_file.type == 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':
@@ -222,7 +223,7 @@ def upload_and_process_data():
                 operating_data['Date'] = pd.to_datetime(operating_data['Date'], errors='coerce')
         except pd.errors.EmptyDataError:
             st.error('Uploaded Operating Data file is empty or could not be parsed.')
-    
+
     if vibration_file is not None:
         try:
             if vibration_file.type == 'application/vnd.ms-excel' or vibration_file.type == 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':
@@ -232,7 +233,7 @@ def upload_and_process_data():
             else:
                 vibration_data = pd.read_csv(vibration_file)
             
-            # Attempt to parse the 'Timestamp' column correctly
+            # Attempt to parse the 'Date' column correctly
             if 'Date' in vibration_data.columns:
                 vibration_data['Date'] = pd.to_datetime(vibration_data['Date'], errors='coerce')
         except pd.errors.EmptyDataError:
@@ -253,7 +254,15 @@ def upload_and_process_data():
         except pd.errors.EmptyDataError:
             st.error('Uploaded Maintenance History file is empty or could not be parsed.')
 
+    # Prepare pump_id_options based on available data
+    if operating_data is not None:
+        pump_id_options = ['All'] + operating_data['PumpID'].unique().tolist()
+    else:
+        pump_id_options = ['All']
+
     return operating_data, vibration_data, maintenance_data, rul_factor
+
+
 
 def main():
     st.title('Pump Maintenance and Performance Analyzer')
@@ -265,9 +274,12 @@ def main():
 
 # Streamlit app layout
 st.title('Pump Maintenance and Performance Analyzer')
+st.markdown('<style>div.block-container{padding-top:2.2rem;}</style>', unsafe_allow_html=True)
+
 
 # Download button for sample_data_formats.txt
-st.markdown(download_sample_data(), unsafe_allow_html=True)
+
+#st.sidebar.markdown(download_sample_data(), unsafe_allow_html=True)
 
 # Upload and process data
 operating_data, vibration_data, maintenance_data, rul_factor = upload_and_process_data()
@@ -302,12 +314,13 @@ if operating_data is not None and maintenance_data is not None and vibration_dat
             col1, col2 = st.columns([2, 2])
 
             with col1:
-                st.subheader('MTBF Trends Over Time')
+                #st.markdown('MTBF Trends Over Time')
                 if 'Date' in operating_data.columns:
                     if selected_pump_id == 'All':
                         # Aggregate operating data by date
                         avg_mtbf_over_time = operating_data.groupby('Date')['Operating Hours'].mean().reset_index()
                         fig = px.line(avg_mtbf_over_time, x='Date', y='Operating Hours', title='Average MTBF Over Time')
+                        fig.update_layout(width=550, height=300)  # Adjust width and height as needed
                         st.plotly_chart(fig)
                     else:
                         st.line_chart(operating_data.set_index('Date')['Operating Hours'])
@@ -315,22 +328,23 @@ if operating_data is not None and maintenance_data is not None and vibration_dat
                     st.error('Cannot parse dates in Operating Data. Please ensure they are in a valid format.')
 
             with col2:
-                st.subheader('Vibration Data Over Time')
+                #st.markdown('Vibration Data Over Time')
                 if vibration_data is not None and 'Date' in vibration_data.columns:
                     if selected_pump_id == 'All':
                         # Aggregate vibration data by timestamp
                         avg_vibration_over_time = vibration_data.groupby('Date').mean().reset_index()
                         fig = px.line(avg_vibration_over_time, x='Date', y='Vibration Level (mm/s)', title='Average Vibration Data Over Time')
+                        fig.update_layout(width=550, height=300)
                         st.plotly_chart(fig)
                     else:
                         st.line_chart(vibration_data.set_index('Date')['Vibration Level (mm/s)'])
 
-            st.header('Estimated Remaining Useful Life (RUL) and Results')
+            #st.markdown('Estimated Remaining Useful Life (RUL) and Results')
 
             col3, col4 = st.columns([1, 2])
 
             with col3:
-                st.subheader('Estimated RUL')
+                st.subheader('***Estimated RUL***')
                 if selected_pump_id == 'All':
                     # Calculate overall average RUL for all pumps
                     estimated_rul_percentage = mtbf_data['RUL (%)'].mean() if not mtbf_data.empty else 0
@@ -350,12 +364,13 @@ if operating_data is not None and maintenance_data is not None and vibration_dat
                                {'range': [50, 100], 'color': "gray"}]},
                     number={'suffix': '%', 'valueformat': '.2f'}))
 
-                fig.update_layout(width=300, height=300)  # Adjust the size of the gauge
+                fig.update_layout(width=550, height=300)  # Adjust the size of the gauge
                 st.plotly_chart(fig)
 
             with col4:
-                st.subheader('MTBF and RUL Results')
-                st.write(mtbf_data)
+                st.subheader('***MTBF and RUL Results***')
+                fig.update_layout(width=550, height=300)
+                st.dataframe(mtbf_data)
 
         else:
             st.error('Required columns (PumpID) are missing in the uploaded files.')
