@@ -2,3 +2,5 @@ plotly
 streamlit
 pandas
 pybase64
+openpyxl
+
