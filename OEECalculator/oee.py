@@ -344,9 +344,10 @@ else:
  
     st.write("**How to Use:**")
     st.write("**Upload Data:** Upload your production data and downtime hours data using the file uploader on the left.")
-    st.write("**View Data:** After uploading, review the data tables to ensure correctness.")
+    st.write("**View Data:** After uploading, review the data tables to ensure correctness, reload the excels as needed.")
     st.write("**Proceed to Visuals:** Click the 'Proceed to Visuals' button to view visualizations and calculated metrics.")
-    st.write("Download Sample Files to try.")
+    st.write("By Default visuals show for ALL Equipments. You may filter on a equipment id for analysis.")
+    st.write("Download Sample Files (zip file) that has the excel templates.")
 
 
     sample_data = pd.DataFrame({
