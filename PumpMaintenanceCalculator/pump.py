@@ -19,6 +19,7 @@ def download_sample_data():
         'Date': ['2024-06-01', '2024-06-02', '2024-06-01', '2024-06-02'],
         'Operating Hours': [8, 5, 4, 2]
     })
+    
 
     sample_vibration_data = pd.DataFrame({
         'PumpID': [1, 1, 2, 2],
