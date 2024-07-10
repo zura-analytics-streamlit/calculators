@@ -1,209 +1,189 @@
 import streamlit as st
 import pandas as pd
-import plotly.express as px
 import plotly.graph_objects as go
+import plotly.express as px
 import base64
-import io
-from zipfile import ZipFile
+import zipfile
+from io import BytesIO
 
-# Title of the app
-st.set_page_config(page_title="OEE Calculator", page_icon="🔢", layout="wide")
-st.title("🔢 Overall Equipment Efficiency (OEE) Calculator")
+
+# Set page configuration (call this only once at the beginning)
+st.set_page_config(layout="wide")
 st.markdown('<style>div.block-container { padding-top: 3rem; background-color: #ECFBF5; }</style>', unsafe_allow_html=True)
 
-# Sample data integration (for testing purposes)
+
+# Define session state keys
+if 'upload_mode' not in st.session_state:
+    st.session_state.upload_mode = False
+
+if 'uploaded_files' not in st.session_state:
+    st.session_state.uploaded_files = {
+        'production_hours_data': None,
+        'downtime_hours_data': None
+    }
+
 def download_sample_data():
-    sample_production_data = """
-production_date,Id,ProductionHrs,ProducedGoods,DefectGoods,IdealCycle
-2024-06-15T00:00:00.000,11,21,817,42,1.4
-2024-06-15T00:00:00.000,12,19,563,50,1.6
-2024-06-15T00:00:00.000,13,17,550,38,1.5
-2024-06-16T00:00:00.000,11,22,977,39,1.3
-2024-06-16T00:00:00.000,12,11,470,27,1.2
-2024-06-16T00:00:00.000,13,17,523,38,1.5
-"""
-    sample_downtime_data = """
-Date,Id,DownTimeHrs
-2024-06-15T00:00:00.000,11,1
-2024-06-15T00:00:00.000,12,3
-2024-06-16T00:00:00.000,11,0
-2024-06-16T00:00:00.000,12,1
-2024-06-16T00:00:00.000,13,3
-2024-06-15T00:00:00.000,13,3
-"""   
+    # Sample Production Hours Data
+    sample_production_hours_data = pd.DataFrame({
+        'Date': ['2024-06-15', '2024-06-15', '2024-06-15', '2024-06-16', '2024-06-16', '2024-06-16'],
+        'Id': [11, 12, 13, 11, 12, 13],
+        'ProductionHrs': [21, 19, 17, 22, 11, 17],
+        'ProducedGoods': [817, 563, 550, 977, 470, 523],
+        'DefectGoods': [42, 50, 38, 39, 27, 38],
+        'IdealCycle': [1.4, 1.6, 1.5, 1.3, 1.2, 1.5]
+    })
 
-    # Create a zip file in memory
-    zip_buffer = io.BytesIO()
-    with ZipFile(zip_buffer, 'w') as zip_file:
-        zip_file.writestr('sample_production_data.csv', sample_production_data)
-        zip_file.writestr('sample_downtime_data.csv', sample_downtime_data)
-    
-    zip_buffer.seek(0)
-    
-    # Encode the zip file in base64
-    b64_zip = base64.b64encode(zip_buffer.read()).decode()
-    
-    # Create download link
-    href_zip = f'<a href="data:file/zip;base64,{b64_zip}" download="sample_data.zip">⬇️ Download Sample Data (ZIP)</a>'
-    
-    return href_zip
+    # Sample Downtime Hours Data
+    sample_downtime_hours_data = pd.DataFrame({
+        'Date': ['2024-06-15', '2024-06-15', '2024-06-15', '2024-06-16', '2024-06-16', '2024-06-16'],
+        'Id': [11, 12, 13, 11, 12, 13],
+        'DownTimeHrs': [1.1, 1.3, 1.5, 0.8, 1.2, 1.0]
+    })
 
-# Display the download link
-download_link = download_sample_data()
+    zip_data = BytesIO()
 
-# Column mapping dictionary
-column_mapping_production = {
-    'Date': ['Date', 'date', 'production_date'],
-    'Id': ['Id', 'id', 'machine_id', 'equipment_id'],
-    'ProductionHrs': ['ProductionHrs', 'production_hours', 'prod_hours','Production Hours','ProductionHours'],
-    'ProducedGoods': ['ProducedGoods', 'produced_goods', 'produced_pieces'],
-    'DefectGoods': ['DefectGoods', 'defect_goods', 'defective_goods'],
-    'IdealCycle': ['IdealCycle', 'ideal_cycle_time', 'ideal_cycle'],
-    'DownTimeHrs': ['DownTimeHrs', 'downtime_hours', 'down_hours']
+    with zipfile.ZipFile(zip_data, mode='w') as zipf:
+        for data, name in zip([sample_production_hours_data, sample_downtime_hours_data],
+                              ['Sample_Production_Hours_Data.xlsx', 'Sample_Downtime_Hours_Data.xlsx']):
+            excel_data = BytesIO()
+            data.to_excel(excel_data, index=False)
+            zipf.writestr(name, excel_data.getvalue())
 
-}
+    zip_data.seek(0)
+    b64 = base64.b64encode(zip_data.read()).decode()
+    href = f'<a href="data:application/zip;base64,{b64}" download="sample_data_oee.zip">Click here </a>'
+    return href
 
-column_mapping_downtime = {
-     'Date': ['Date', 'date', 'production_date'],
-    'Id': ['Id', 'id', 'machine_id', 'equipment_id'],
-     'ProductionHrs': ['ProductionHrs', 'production_hours', 'prod_hours','Production Hours','ProductionHours'],
-    'ProducedGoods': ['ProducedGoods', 'produced_goods', 'produced_pieces'],
-    'DefectGoods': ['DefectGoods', 'defect_goods', 'defective_goods'],
-    'IdealCycle': ['IdealCycle', 'ideal_cycle_time', 'ideal_cycle'],
-    'DownTimeHrs': ['DownTimeHrs', 'downtime_hours', 'down_hours']
-}
+def calculate_oee(production_hours_data, downtime_hours_data):
+    # Merge production and downtime data
+    merged_data = pd.merge(production_hours_data, downtime_hours_data, on=['Date', 'Id'])
 
-def load_data(file):
-    if file.name.endswith('.csv'):
-        return pd.read_csv(file)
-    elif file.name.endswith('.xlsx'):
-        return pd.read_excel(file)
-    else:
-        raise ValueError("Unsupported file format")
+    # Calculate OEE Components
+    merged_data['Availability'] = (merged_data['ProductionHrs'] - merged_data['DownTimeHrs']) / merged_data['ProductionHrs']
+    merged_data['Performance'] = (merged_data['ProducedGoods'] * merged_data['IdealCycle']) / ((merged_data['ProductionHrs'] - merged_data['DownTimeHrs']) * 60)
+    merged_data['Quality'] = (merged_data['ProducedGoods'] - merged_data['DefectGoods']) / merged_data['ProducedGoods']
+    merged_data['OEE'] = merged_data['Availability'] * merged_data['Performance'] * merged_data['Quality'] * 100
 
-def standardize_columns(data, column_mapping):
-    reverse_mapping = {}
-    for standard_name, aliases in column_mapping.items():
-        for alias in aliases:
-            reverse_mapping[alias] = standard_name
-    return data.rename(columns=reverse_mapping)
+    return merged_data
 
-# File uploads
-with st.sidebar.expander("**Upload Data files**"):
-    production_file = st.file_uploader("**Production Data** ", type=["csv","xlsx"])
-    downtime_file = st.file_uploader("**Downtime Data**", type=["csv","xlsx"])
-    st.markdown(download_link, unsafe_allow_html=True)
-    
-if production_file is not None and downtime_file is not None:
-    try:
-        # Read and standardize the uploaded production data file
-        production_data = load_data(production_file)
-        #st.write(production_data)
-        production_data = standardize_columns(production_data, column_mapping_production)
-        
-        # Read and standardize the uploaded downtime data file
-        downtime_data = load_data(downtime_file)
-        #st.write(downtime_data)
-        downtime_data = standardize_columns(downtime_data, column_mapping_downtime)
-      
-        # Ensure the 'Date' columns are in datetime format
-        production_data['Date'] = pd.to_datetime(production_data['Date'])
-        downtime_data['Date'] = pd.to_datetime(downtime_data['Date'])
 
-        # Check if the required columns are present in either data
-        required_columns = ["Date", "Id", "ProductionHrs", "ProducedGoods", "DefectGoods", "DownTimeHrs"]
-        production_columns = production_data.columns.tolist()
-        downtime_columns = downtime_data.columns.tolist()
-        
-        if any(column in production_columns for column in required_columns) or \
-           any(column in downtime_columns for column in required_columns):
-           
-            # Merge the production and downtime data on available columns
-            common_columns = list(set(production_data.columns) & set(downtime_data.columns))
-            data = pd.merge(production_data, downtime_data, on=common_columns, how='outer')
-            
-            # Calculate availability for each record
-            data['Availability'] = (data['ProductionHrs'] - data['DownTimeHrs']) / data['ProductionHrs']
+def main():
+    st.title('🔢Overall Equipment Effectiveness (OEE) Calculator')
 
-            # Get unique equipment IDs
-            equipment_ids = data['Id'].unique()
+    if st.session_state.upload_mode:
+        # File upload mode
+        with st.sidebar.expander("Upload your files"):
+            production_hours_file = st.file_uploader(" Production Data", type=["xlsx"])
+            downtime_hours_file = st.file_uploader("Downtime Hours Data", type=["xlsx"])
 
-            # Display all equipment IDs by default
-            selected_equipment_id = st.sidebar.selectbox('Select Equipment ID', ['All'] + list(equipment_ids))
+            if production_hours_file:
+                st.session_state.uploaded_files['production_hours_data'] = production_hours_file
+            if downtime_hours_file:
+                st.session_state.uploaded_files['downtime_hours_data'] = downtime_hours_file
 
-            # Filter data based on the selected equipment ID
-            if selected_equipment_id == 'All':
-                filtered_data = data.copy()  # Show all data if 'All' is selected
+        uploaded_files = st.session_state.uploaded_files
+
+        if all(uploaded_files.values()):
+            production_hours_data = pd.read_excel(uploaded_files['production_hours_data'])
+            downtime_hours_data = pd.read_excel(uploaded_files['downtime_hours_data'])
+
+            # Merge data
+            merged_data = pd.merge(production_hours_data, downtime_hours_data, on=['Date', 'Id'])
+
+            # Calculate OEE Components
+            merged_data['Availability'] = (merged_data['ProductionHrs'] - merged_data['DownTimeHrs']) / merged_data['ProductionHrs']
+            merged_data['Performance'] = (merged_data['ProducedGoods'] * merged_data['IdealCycle']) / ((merged_data['ProductionHrs'] - merged_data['DownTimeHrs']) * 60)
+            merged_data['Quality'] = (merged_data['ProducedGoods'] - merged_data['DefectGoods']) / merged_data['ProducedGoods']
+            merged_data['OEE'] = merged_data['Availability'] * merged_data['Performance'] * merged_data['Quality'] 
+
+            st.sidebar.subheader('Filter Results by ID')
+            available_ids = merged_data['Id'].unique().tolist()
+            selected_id = st.sidebar.selectbox('Select ID', ['All'] + available_ids)
+
+            if selected_id != 'All':
+                filtered_data = merged_data[merged_data['Id'] == selected_id]
             else:
-                filtered_data = data[data['Id'] == selected_equipment_id]
+                filtered_data = merged_data
 
-            # Calculate OEE for each record
-            for index, row in filtered_data.iterrows():
-                production_hours = row.get("ProductionHrs", 0)
-                downtime_hours = row.get("DownTimeHrs", 0)
-                ideal_cycle_time = row.get("IdealCycle", 0)
-                total_pieces_produced = row.get("ProducedGoods", 0)
-                defect_goods_produced = row.get("DefectGoods", 0)
-                good_pieces_produced = total_pieces_produced - defect_goods_produced
+            # Calculate averages
+            average_availability = filtered_data['Availability'].mean()
+            average_performance = filtered_data['Performance'].mean()
+            average_quality = filtered_data['Quality'].mean()
+            average_oee = (average_availability * average_performance * average_quality) * 100
 
-                # Calculate availability
-                if production_hours > 0:
-                    operating_time = production_hours - downtime_hours
-                    availability = operating_time / production_hours
-                else:
-                    availability = 0
+            st.header('Uploaded Data')
+            col1, col2 = st.columns(2)
 
-                # Calculate performance
-                if operating_time > 0 and total_pieces_produced > 0:
-                    net_operating_time = ideal_cycle_time * total_pieces_produced
-                    performance = net_operating_time / (operating_time * 60)  # converting hours to minutes
-                else:
-                    performance = 0
+            with col1:
+                st.write('Production Hours Data')
+                st.dataframe(production_hours_data)
 
-                # Calculate quality
-                if total_pieces_produced > 0:
-                    quality = good_pieces_produced / total_pieces_produced
-                else:
-                    quality = 0
+            with col2:
+                st.write('Downtime Hours Data')
+                st.dataframe(downtime_hours_data)
 
-                # Calculate OEE
-                oee = availability * performance * quality
+            # Gauge Chart for Average Availability
+            fig_availability = go.Figure(go.Indicator(
+                 mode="gauge+number",
+                 value=average_availability * 100,
+                 title={'text': "Average Availability"},
+                 gauge={'axis': {'range': [0, 100]},
+           'bar': {'color': "#2779B7"},
+           'steps': [
+               {'range': [0, 50], 'color': "lightgray"},
+               {'range': [50, 100], 'color': "lightgray"}]},
+                number={'suffix': '%', 'valueformat': '.2f'}))
+            fig_availability.update_layout(width=500,height=330 )
 
-                # Add OEE to the current row
-                filtered_data.loc[index, 'OEE'] = oee
-                filtered_data.loc[index, 'Availability'] = availability
-                filtered_data.loc[index, 'Performance'] = performance
-                filtered_data.loc[index, 'Quality'] = quality
+# Gauge Chart for Average Performance
+            fig_performance = go.Figure(go.Indicator(
+            mode="gauge+number",
+            value=average_performance * 100,
+            title={'text': "Average Performance"},
+            gauge={'axis': {'range': [0, 100]},
+           'bar': {'color': "#83C9FF"},
+           'steps': [
+               {'range': [0, 50], 'color': "lightgray"},
+               {'range': [50, 100], 'color': "lightgray"}]},
+            number={'suffix': '%', 'valueformat': '.2f'}))
+           
+            fig_performance.update_layout(width=500,height=330 )
 
-            # Display results for each record in a table
-            filtered_data_display = filtered_data[['Date', 'Id', 'Availability', 'Performance', 'Quality', 'OEE']]
-            filtered_data_display['Availability'] = filtered_data_display['Availability'].apply(lambda x: f"{x:.2%}")
-            filtered_data_display['Performance'] = filtered_data_display['Performance'].apply(lambda x: f"{x:.2%}")
-            filtered_data_display['Quality'] = filtered_data_display['Quality'].apply(lambda x: f"{x:.2%}")
-            filtered_data_display['OEE'] = filtered_data_display['OEE'].apply(lambda x: f"{x:.2%}")
-   
 
-            # Format OEE values as percentages for display
-            avg_oee_data = filtered_data.groupby('Id')['OEE'].mean().reset_index()
-            avg_oee_data.columns = ['Id', 'OEE']
 
-            # Remove rows with NaN or empty OEE values
-            avg_oee_data = avg_oee_data.dropna(subset=['OEE'])
+# Gauge Chart for Average Quality
+            fig_quality = go.Figure(go.Indicator(
+            mode="gauge+number",
+            value=average_quality * 100,
+            title={'text': "Average Quality"},
+            gauge={'axis': {'range': [0, 100]},
+           'bar': {'color': "#FF2B2B"},
+           'steps': [
+               {'range': [0, 50], 'color': "lightgray"},
+               {'range': [50, 100], 'color': "lightgray"}]},
+            number={'suffix': '%', 'valueformat': '.2f'}))
+            fig_quality.update_layout(width=500,height=330 ) 
 
-            # Format OEE values as percentages for display
-            avg_oee_data['OEE'] = avg_oee_data['OEE'].apply(lambda x: f"{x:.2%}")
-                     
-            # Calculate average OEE for all vehicles on each date
+
+# Gauge Chart for Average OEE
+            fig_oee = go.Figure(go.Indicator(
+            mode="gauge+number",
+            value=average_oee,
+            title={'text': "Average OEE"},
+            gauge={'axis': {'range': [0, 100]},
+           'bar': {'color': "#FFABAB"},
+           'steps': [
+               {'range': [0, 50], 'color': "lightgray"},
+               {'range': [50, 100], 'color': "lightgray"}]},
+            number={'suffix': '%', 'valueformat': '.2f'}))
+            fig_oee.update_layout(width=500,height=330 )
+
             avg_oee_date_data = filtered_data.groupby('Date')['OEE'].mean().reset_index()
+            fig_oee_over_time = px.line(avg_oee_date_data, x='Date', y='OEE', title='Average OEE of Equipment on Each Date',height=350)
+            fig_oee_over_time.update_layout(xaxis_title='Date', yaxis_title='Average OEE')
 
-            # Visualize average OEE using a line chart
-            fig_avg_oee_date = px.line(avg_oee_date_data, x='Date', y='OEE', title='Average OEE of Equipment on Each Date',
-                                       labels={'Date': 'Date', 'OEE': 'Average OEE'},
-                                       hover_data={'OEE': True},
-                                       height=350)
-            fig_avg_oee_date.update_traces(texttemplate='%{y:.2%}')
+           
 
-            # Calculate average Availability, Performance, and Quality for each equipment
             avg_metrics_data = filtered_data.groupby('Id')[['Availability', 'Performance', 'Quality', 'OEE']].mean().reset_index()
             avg_metrics_data = avg_metrics_data.melt(id_vars=['Id'], value_vars=['Availability', 'Performance', 'Quality', 'OEE'],
                                                      var_name='Metric', value_name='Average')
@@ -214,159 +194,300 @@ if production_file is not None and downtime_file is not None:
                                      labels={'Id': 'Equipment ID', 'Average': 'Average Value'},
                                      hover_data={'Average': True},
                                      height=350)
-
-            # Calculate overall averages for gauges
-            overall_avg_availability = filtered_data['Availability'].mean()
-            overall_avg_performance = filtered_data['Performance'].mean()
-            overall_avg_quality = filtered_data['Quality'].mean()
-            overall_avg_oee = filtered_data['OEE'].mean()
-
-            # Create gauge charts for overall averages
-            fig_gauge_availability = go.Figure(go.Indicator(
-                mode="gauge+number+delta",
-                value=overall_avg_availability * 100,
-                title={'text': "Average Availability"},
-                gauge={'axis': {'range': [None, 100]}, 'bar': {'color': "#2779B7"}},
-                number={'suffix': '%', 'valueformat': '.2f'} ))
-
-            fig_gauge_availability.update_layout(
-            width=500, 
-            height=330 ) 
-
-            fig_gauge_performance = go.Figure(go.Indicator(
-                mode="gauge+number+delta",
-                value=overall_avg_performance * 100,
-                title={'text': "Average Performance"},
-                gauge={'axis': {'range': [None, 100]}, 'bar': {'color': "#83C9FF"}},
-                number={'suffix': '%', 'valueformat': '.2f'} ))
-
-            fig_gauge_performance.update_layout(
-            width=500, 
-            height=330 ) 
+            fig_avg_metrics.update_traces(texttemplate='%{y:.2%}')
 
 
-            fig_gauge_quality = go.Figure(go.Indicator(
-                mode="gauge+number+delta",
-                value=overall_avg_quality * 100,
-                title={'text': "Average Quality"},
-                gauge={'axis': {'range': [None, 100]}, 'bar': {'color': "#FF2B2B"}},
-                number={'suffix': '%', 'valueformat': '.2f'} ))
-            fig_gauge_quality.update_layout(
-            width=500, 
-            height=330 ) 
+            # Calculate average OEE for each equipment ID
+            avg_oee_data = filtered_data.groupby('Id')['OEE'].mean().reset_index()
+            avg_oee_data.columns = ['Id', 'Average OEE']
+            avg_oee_data['Average OEE'] = avg_oee_data['Average OEE'].apply(lambda x: f"{x * 100:.2f}%")
+              
 
-            fig_gauge_oee = go.Figure(go.Indicator(
-                mode="gauge+number+delta",
-                value=overall_avg_oee * 100,
-                title={'text': "Average OEE"},
-                gauge={'axis': {'range': [None, 100]}, 'bar': {'color': "#FFABAB"}},
-                number={'suffix': '%', 'valueformat': '.2f'} ))
-            fig_gauge_oee.update_layout(
-            width=500, 
-            height=330 )
+            # Display results for each record in a table
+            filtered_data_display = filtered_data[['Date', 'Id', 'Availability', 'Performance', 'Quality', 'OEE']]
+            filtered_data_display['Availability'] = filtered_data_display['Availability'].apply(lambda x: f"{x:.2%}")
+            filtered_data_display['Performance'] = filtered_data_display['Performance'].apply(lambda x: f"{x:.2%}")
+            filtered_data_display['Quality'] = filtered_data_display['Quality'].apply(lambda x: f"{x:.2%}")
+            filtered_data_display['OEE'] = filtered_data_display['OEE'].apply(lambda x: f"{x:.2%}")
 
-
-           
-            col1, col2 = st.columns(2)
-            with col1:
-                st.write("**Uploaded Production Data**")
-                st.dataframe(production_data,height=250,use_container_width=True)
-
-            with col2:
-                st.write('**Uploaded Downtime Data**')
-                st.dataframe(downtime_data,height=250,use_container_width=True)
-
-
-            st.subheader("OEE Calculations")  
-                      # Create a dashboard layout
-
-            if selected_equipment_id == 'All':
+            st.markdown("<h2 style='text-align: center; color: black;'>Visuals genetated from the uploaded data</h2>", unsafe_allow_html=True)
+            
+            if selected_id == 'All':
                   
                    # Display summary of metrics as text
                     st.markdown("**Summary**")
                     st.markdown(
                      f"""
                      <div style="color: blue;">
-                    For Equipment IDs  <strong>{selected_equipment_id}</strong> ,
-                    the Average Availability is  <strong>{overall_avg_availability:.2%}</strong> ,
-                    the Average Performance is  <strong>{overall_avg_performance:.2%}</strong> ,
-                    the Average Quality is  <strong>{overall_avg_quality:.2%}</strong> ,
-                    and the Average OEE is  <strong>{overall_avg_oee:.2%}</strong>.</div>""", unsafe_allow_html=True)
+                    For Equipment IDs   <strong>{selected_id}</strong> ,
+                    the Average Availability is  <strong>{average_availability:.2%}</strong> ,
+                    the Average Performance is  <strong>{average_performance:.2%}</strong> ,
+                    the Average Quality is  <strong>{average_quality:.2%}</strong> ,
+                    and the Average OEE is  <strong>{average_oee/100:.2%}</strong>.</div>""", unsafe_allow_html=True)
             else:
                    
                    # Display summary of metrics as text
                     st.markdown("**Summary**")
                     st.markdown(f""" <div style="color: blue;">
-                    For Equipment IDs  <strong>{selected_equipment_id}</strong> ,
-                    the Average Availability is  <strong>{overall_avg_availability:.2%}</strong> ,
-                    the Average Performance is  <strong>{overall_avg_performance:.2%}</strong> ,
-                    the Average Quality is  <strong>{overall_avg_quality:.2%}</strong> ,
-                    and the Average OEE is  <strong>{overall_avg_oee:.2%}</strong>.
+                    For Equipment ID   <strong>{selected_id}</strong> ,
+                    the Average Availability is  <strong>{average_availability:.2%}</strong> ,
+                    the Average Performance is  <strong>{average_performance:.2%}</strong> ,
+                    the Average Quality is  <strong>{average_quality :.2%}</strong> ,
+                    and the Average OEE is  <strong>{average_oee/100:.2%}</strong>.
                    </div>
                """, unsafe_allow_html=True)
 
 
-            #st.markdown("**Average Metrics Gauges**")
 
-            col3, col4, col5, col6 = st.columns(4)
+            # Display gauge charts for average metrics
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.plotly_chart(fig_availability)
+            with col2:
+                st.plotly_chart(fig_performance)
             with col3:
-                st.plotly_chart(fig_gauge_availability, use_container_width=True)
+                st.plotly_chart(fig_quality)
             with col4:
-                st.plotly_chart(fig_gauge_performance, use_container_width=True)
-            with col5:
-                st.plotly_chart(fig_gauge_quality, use_container_width=True)
-            with col6:
-                st.plotly_chart(fig_gauge_oee, use_container_width=True)
-            
-            col7, col8 = st.columns(2)
-            with col7:
-                st.plotly_chart(fig_avg_oee_date, use_container_width=True)
-            with col8:
-                st.plotly_chart(fig_avg_metrics, use_container_width=True)
+                st.plotly_chart(fig_oee)
 
-            col9, col10 = st.columns(2)
-            with col9:
+
+            col5,col6=st.columns(2)
+            with col5:
+                st.plotly_chart(fig_oee_over_time,use_container_width=True)
+            with col6:
+                st.plotly_chart(fig_avg_metrics,use_container_width=True)
+
+            col7,col8=st.columns(2)
+            with col7:
                 st.write("**Equipment Metric Details**")
                 st.dataframe(filtered_data_display,height=300,use_container_width=True)
-                #st.write(filtered_data_display)
-            with col10:
-                st.write('**Average OEE of Each Equipment**')
-                #st.write(avg_oee_data,height=300,use_container_width=True)
+            with col8:
+                st.write("**Average OEE of Each Equipment**")
                 st.dataframe(avg_oee_data,height=300,use_container_width=True)
-
-
-        else:
-            st.write(f"Error: The uploaded files must contain the required columns in either of the files.")
-    except Exception as e:
-        st.write(f"An error occurred: {e}")
-else:
-    st.write("OEE stands for Overall Equipment Effectives. It is metric used in manufacturing to measure the efficiency and productivity of a equipment or machinery. It is used to evaluate how effectively an equipment is utilized.An OEE calculator automates the process of calculating the OEE for a given set of manufacturing data. The calculator typically requires input data such as production hours, downtime hours, produced goods, defective goods, and the ideal cycle time.")
  
-    st.write("**How to Use:**")
-    st.write("**Upload Data:** Upload your production data and downtime hours data using the file uploader on the left.")
-    st.write("**View Data:** After uploading, review the data tables to ensure correctness, reload the excels as needed.")
-    st.write("**Proceed to Visuals:** Click the 'Proceed to Visuals' button to view visualizations and calculated metrics.")
-    st.write("By Default visuals show for ALL Equipments. You may filter on a equipment id for analysis.")
-    st.write("Download Sample Files (zip file) that has the excel templates.")
+        else:
+            st.warning('Please upload all required files.')
+
+    else:
+        download_link=download_sample_data()
+        st.markdown(f"""
+         OEE stands for **Overall Equipment Effectiveness**. It is a metric used in manufacturing to measure the efficiency and productivity of equipment or machinery. It is used to evaluate how effectively an equipment is utilized. An OEE calculator automates the process of calculating the OEE for a given set of manufacturing data. The calculator typically requires input data such as production hours, downtime hours, produced goods, defective goods, and the ideal cycle time.
+
+       **Availability**⏱️: Availability represents the percentage of time an equipment remains fully operational and ready to uses, excluding downtime.
+
+       **Performance**⚙️: Performance represents the ratio of the actual quantity produced to the planned quantity, indicating how well equipment meets its production targets.
+
+       **Quality**✔️: Quality represents the percentage of good units produced out of the total units produced, indicating production efficiency. 
+
+       This Calculator will need Production Hours Data, Downtime Hours Data dataset as detailed below along with attributes explained. 
+       This data can be loaded using excel files({download_link} to download excel templates and sample data). You may add corresponding data into each of the excel template, save and upload to view the visuals per the uploaded data.
+       
+       To start with we have few samples for each of the required inputs (Production Hours Data, Downtime Hours Data), using which the visuals below are displayed.  You may use the Equipmnet ID filter in the LEFT pane to view filtered visuals.
+  
+        **Sample Data Tables:** Below are sample tables for each type of data: 
+        """,unsafe_allow_html=True)
+      
+        # Sample Data Tables
+        sample_production_hours_data = pd.DataFrame({
+        'Date': ['2024-06-15', '2024-06-15', '2024-06-15', '2024-06-16', '2024-06-16', '2024-06-16'],
+        'Id': [11, 12, 13, 11, 12, 13],
+        'ProductionHrs': [21, 19, 17, 22, 11, 17],
+        'ProducedGoods': [817, 563, 550, 977, 470, 523],
+        'DefectGoods': [42, 50, 38, 39, 27, 38],
+        'IdealCycle': [1.4, 1.6, 1.5, 1.3, 1.2, 1.5]
+    })
+
+        sample_downtime_hours_data = pd.DataFrame({
+        'Date': ['2024-06-15', '2024-06-15', '2024-06-15', '2024-06-16', '2024-06-16', '2024-06-16'],
+        'Id': [11, 12, 13, 11, 12, 13],
+        'DownTimeHrs': [1.1, 1.3, 1.5, 0.8, 1.2, 1.0]
+    })
 
 
-    sample_data = pd.DataFrame({
-    'Date': ['2023-01-01', '2023-01-02', '2023-01-03'],
-    'Id': [1, 2, 3],
-    'ProductionHrs': [8, 7.5, 7],
-    'ProducedGoods': [800, 750, 700],
-    'DefectGoods': [20, 15, 10],
-    'IdealCycle': [0.5, 0.6, 0.4]})
-    st.markdown('**Sample Production Hours Data**')
-    st.write(sample_data)
 
-    sample_data1 = pd.DataFrame({
-    'Date': ['2023-01-01', '2023-01-02', '2023-01-03'],
-    'Id': [1, 2, 3],
-    'DownTimeHrs': [1, 0.5, 1.2]
-  })
-    st.markdown('**Sample Downtime Hours Data**')
-    st.write(sample_data1)
-    st.markdown('<span style="color:red">❗ Please upload both production and downtime files to proceed.</span>', unsafe_allow_html=True)
-    
-    
+        merged_data = pd.merge(sample_production_hours_data, sample_downtime_hours_data, on=['Date', 'Id'])
+
+        merged_data['Availability'] = (merged_data['ProductionHrs'] - merged_data['DownTimeHrs']) / merged_data['ProductionHrs']
+        merged_data['Performance'] = (merged_data['ProducedGoods'] * merged_data['IdealCycle']) / ((merged_data['ProductionHrs'] - merged_data['DownTimeHrs']) * 60)
+        merged_data['Quality'] = (merged_data['ProducedGoods'] - merged_data['DefectGoods']) / merged_data['ProducedGoods']
+        merged_data['OEE'] = merged_data['Availability'] * merged_data['Performance'] * merged_data['Quality'] * 100
+
+        st.sidebar.subheader('Filter by Equipment ID')
+        available_ids = merged_data['Id'].unique().tolist()
+        selected_id = st.sidebar.selectbox('Select ID', ['All'] + available_ids)
+
+        if selected_id != 'All':
+          filtered_data = merged_data[merged_data['Id'] == selected_id]
+        else:
+          filtered_data = merged_data
+
+        average_availability = filtered_data['Availability'].mean()
+        average_performance = filtered_data['Performance'].mean()
+        average_quality = filtered_data['Quality'].mean()
+        average_oee = (average_availability * average_performance * average_quality)*100
+
+        avg_oee_date_data = filtered_data.groupby('Date')['OEE'].mean().reset_index()
+        fig_oee_over_time = px.line(avg_oee_date_data, x='Date', y='OEE', title='Average OEE of Equipment on Each Date')
+
+        avg_metrics_data = filtered_data.groupby('Id')[['Availability', 'Performance', 'Quality']].mean().reset_index()
+        avg_metrics_data = avg_metrics_data.melt(id_vars=['Id'], value_vars=['Availability', 'Performance', 'Quality'],
+                                                     var_name='Metric', value_name='Average')
+
+            # Visualize average Availability, Performance, and Quality using a bar chart
+        fig_avg_metrics = px.bar(avg_metrics_data, x='Id', y='Average', color='Metric', barmode='group',
+                                     title='Average Availability, Performance, Quality, and OEE of Each Equipment',
+                                     labels={'Id': 'Equipment ID', 'Average': 'Average Value'},
+                                     hover_data={'Average': True},
+                                     height=350)
+        fig_avg_metrics.update_traces(texttemplate='%{y:.2%}')
+
+        fig_availability = go.Figure(go.Indicator(
+         mode="gauge+number",
+         value=average_availability * 100,
+         title={'text': "Average Availability"},
+         gauge={'axis': {'range': [0, 100]},
+               'bar': {'color': "#2779B7"},
+               'steps': [
+                   {'range': [0, 50], 'color': "lightgray"},
+                   {'range': [50, 100], 'color': "lightgray"}]},
+         number={'suffix': '%', 'valueformat': '.2f'}))
+        fig_availability.update_layout(width=500, height=330)
+
+        fig_performance = go.Figure(go.Indicator(
+         mode="gauge+number",
+         value=average_performance * 100,
+         title={'text': "Average Performance"},
+         gauge={'axis': {'range': [0, 100]},
+               'bar': {'color': "#83C9FF"},
+               'steps': [
+                   {'range': [0, 50], 'color': "lightgray"},
+                   {'range': [50, 100], 'color': "lightgray"}]},
+         number={'suffix': '%', 'valueformat': '.2f'}))
+        fig_performance.update_layout(width=500, height=330)
+
+        fig_quality = go.Figure(go.Indicator(
+         mode="gauge+number",
+         value=average_quality * 100,
+         title={'text': "Average Quality"},
+         gauge={'axis': {'range': [0, 100]},
+               'bar': {'color': "#FF2B2B"},
+               'steps': [
+                   {'range': [0, 50], 'color': "lightgray"},
+                   {'range': [50, 100], 'color': "lightgray"}]},
+         number={'suffix': '%', 'valueformat': '.2f'}))
+        fig_quality.update_layout(width=500, height=330)
+
+        fig_oee = go.Figure(go.Indicator(
+        mode="gauge+number",
+        value=average_oee,
+        title={'text': "Average OEE"},
+        gauge={'axis': {'range': [0, 100]},
+               'bar': {'color': "#FFABAB"},
+               'steps': [
+                   {'range': [0, 50], 'color': "lightgray"},
+                   {'range': [50, 100], 'color': "lightgray"}]},
+        number={'suffix': '%', 'valueformat': '.2f'}))
+        fig_oee.update_layout(width=500, height=330)
+
+        col1, col2 = st.columns(2)
+        with col1:
+          st.subheader('Sample Production Hours Data')
+          st.write("""
+**Date**: The  date on which the production activity took place. 
+
+**Id**: This is the unique identifier for the equipment or machinery.
+
+**ProductionHrs**: This indicates the number of hours the equipment was in operation during the specified date.
+
+**ProducedGoods**: This represents the total number of goods produced by the equipment during the specified date. 
+
+**DefectGoods**: This indicates the number of defective goods produced during the specified date.
+
+**IdealCycle**: This is the ideal or target cycle time for producing one unit of the product. 
+""")
+          st.dataframe(sample_production_hours_data, height=250, use_container_width=True)
+
+        with col2:
+          st.subheader('Sample Downtime Hours Data')
+          st.write(""" 
+**Date**: This is the specific date on which the downtime of the equipment was recorded.
+
+**Id**: This is the unique identifier for the equipment or production line experiencing downtime.
+
+**DownTimeHrs**: This represents the number of hours the equipment  was not operational due to downtime during the specified date.
+
+Downtime can be due to various reasons such as maintenance, equipment failure, or other disruptions.
+
+It is a critical metric for calculating the availability of the equipment.
+""")
+          st.dataframe(sample_downtime_hours_data, height=250, use_container_width=True)
+        st.markdown("<h2 style='text-align: center; color: black;'>Visuals genetated from the Sample data</h2>", unsafe_allow_html=True)
+            
+        if selected_id == 'All':
+                  
+                   # Display summary of metrics as text
+                    st.markdown("**Summary**")
+                    st.markdown(
+                     f"""
+                     <div style="color: blue;">
+                    For Equipment IDs   <strong>{selected_id}</strong> ,
+                    the Average Availability is  <strong>{average_availability:.2%}</strong> ,
+                    the Average Performance is  <strong>{average_performance:.2%}</strong> ,
+                    the Average Quality is  <strong>{average_quality:.2%}</strong> ,
+                    and the Average OEE is  <strong>{average_oee/100:.2%}</strong>.</div>""", unsafe_allow_html=True)
+        else:
+                   
+                   # Display summary of metrics as text
+                    st.markdown("**Summary**")
+                    st.markdown(f""" <div style="color: blue;">
+                    For Equipment ID   <strong>{selected_id}</strong> ,
+                    the Average Availability is  <strong>{average_availability:.2%}</strong> ,
+                    the Average Performance is  <strong>{average_performance:.2%}</strong> ,
+                    the Average Quality is  <strong>{average_quality :.2%}</strong> ,
+                    and the Average OEE is  <strong>{average_oee/100:.2%}</strong>.
+                   </div>
+               """, unsafe_allow_html=True)
+        
+
+    # Display gauge charts for average metrics
+        col3, col4, col5, col6 = st.columns(4)
+        with col3:
+         st.plotly_chart(fig_availability, use_container_width=True)
+        with col4:
+         st.plotly_chart(fig_performance, use_container_width=True)
+        with col5:
+         st.plotly_chart(fig_quality, use_container_width=True)
+        with col6:
+         st.plotly_chart(fig_oee, use_container_width=True)
+
+        col5, col6 = st.columns(2)
+        with col5:
+         st.plotly_chart(fig_oee_over_time, use_container_width=True)
+        with col6:
+         st.plotly_chart(fig_avg_metrics, use_container_width=True)
+
+        col7, col8 = st.columns(2)
+        with col7:
+          st.write("**Equipment Metric Details**")
+          st.dataframe(filtered_data, height=300, use_container_width=True)
+        with col8:
+         st.write("**Average OEE of Each Equipment**")
+         avg_oee_data = filtered_data.groupby('Id')['OEE'].mean().reset_index()
+         st.dataframe(avg_oee_data, height=300, use_container_width=True)
+
+
+
+
+       # st.markdown("""**NOTE**: You can download the sample zip file and unzip the file and modify with your data and then you can click on Proceed to Upload Files""")
+       # st.session_state.upload_mode = st.button('Proceed to Upload Files')
+
+        st.sidebar.write("---")
+        st.sidebar.header('***Want to try with your own data***')
+        st.sidebar.markdown(f"""{download_link} for excel templates""", unsafe_allow_html=True)
+
+        if st.sidebar.button('Proceed to Upload Files'):
+            st.session_state.uploaded_files = {'operating_data': None, 'vibration_data': None, 'maintenance_data': None, 'equipment_data': None}
+
+
+if __name__ == '__main__':
+    main()
