@@ -221,7 +221,7 @@ def main():
 
     else:
         # Show description and sample data
-        st.subheader('Pump Maintenance and Performance Analyzer')
+        #st.subheader('Pump Maintenance and Performance Analyzer')
         
         # Description of the Pump Maintenance Calculator
         download_link = download_sample_data()
@@ -383,7 +383,8 @@ def main():
         st.sidebar.header('***Want to try with your own data***')
         st.sidebar.markdown(f"""{download_link} for excel templates""", unsafe_allow_html=True)
 
-        if st.sidebar.button('Proceed to Upload Files'):
+        st.session_state.upload_mode = st.sidebar.button('Proceed to Upload Files')
+        if st.session_state.upload_mode:
             st.session_state.uploaded_files = {'operating_data': None, 'vibration_data': None, 'maintenance_data': None, 'equipment_data': None}
 
 if __name__ == '__main__':

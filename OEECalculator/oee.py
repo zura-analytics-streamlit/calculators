@@ -478,15 +478,15 @@ It is a critical metric for calculating the availability of the equipment.
 
 
 
-       # st.markdown("""**NOTE**: You can download the sample zip file and unzip the file and modify with your data and then you can click on Proceed to Upload Files""")
-       # st.session_state.upload_mode = st.button('Proceed to Upload Files')
+         st.sidebar.markdown('***Want to try with your own data***')
+         st.session_state.upload_mode = st.sidebar.button('Proceed to Upload Files')
 
-        st.sidebar.write("---")
-        st.sidebar.header('***Want to try with your own data***')
-        st.sidebar.markdown(f"""{download_link} for excel templates""", unsafe_allow_html=True)
+        #st.sidebar.write("---")
+        #st.sidebar.header('**Want to try with your own data**')
+        #st.sidebar.markdown(f"""{download_link} for excel templates""", unsafe_allow_html=True)
 
-        if st.sidebar.button('Proceed to Upload Files'):
-            st.session_state.uploaded_files = {'operating_data': None, 'vibration_data': None, 'maintenance_data': None, 'equipment_data': None}
+        #if st.sidebar.button('Proceed to Upload Files'):
+            #st.session_state.uploaded_files = {'operating_data': None, 'vibration_data': None, 'maintenance_data': None, 'equipment_data': None}
 
 
 if __name__ == '__main__':
