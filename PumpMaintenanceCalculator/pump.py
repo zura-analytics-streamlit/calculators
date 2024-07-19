@@ -191,7 +191,7 @@ def main():
                     filtered_operating_data = operating_data[operating_data['PumpID'].isin(filtered_mtbf_data['PumpID'])]
                     avg_operating_data = filtered_operating_data.groupby('Date')['Operating Hours'].mean().reset_index()
                     fig = px.line(avg_operating_data, x='Date', y='Operating Hours')
-                    fig.update_layout(title='', xaxis_title='Date', yaxis_title='Operating Hours',width=350, height=350)
+                    fig.update_layout(title='', xaxis_title='Date', yaxis_title='Operating Hours')
                     st.plotly_chart(fig)
 
             with col2:
@@ -200,7 +200,7 @@ def main():
                     filtered_vibration_data = vibration_data[vibration_data['PumpID'].isin(filtered_mtbf_data['PumpID'])]
                     avg_vibration_data = filtered_vibration_data.groupby('Date')['Vibration Level (mm/s)'].mean().reset_index()
                     fig = px.line(avg_vibration_data, x='Date', y='Vibration Level (mm/s)')
-                    fig.update_layout(title='', xaxis_title='Date', yaxis_title='Vibration Level (mm/s)',width=350, height=350)
+                    fig.update_layout(title='', xaxis_title='Date', yaxis_title='Vibration Level (mm/s)')
                     st.plotly_chart(fig)
 
             col3, col4 = st.columns([1, 1])
