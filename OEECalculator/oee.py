@@ -271,20 +271,21 @@ def main():
     else:
         download_link=download_sample_data()
         st.markdown(f"""
-         OEE stands for **Overall Equipment Effectiveness**. It is a metric used in manufacturing to measure the efficiency and productivity of equipment or machinery. It is used to evaluate how effectively an equipment is utilized. An OEE calculator automates the process of calculating the OEE for a given set of manufacturing data. The calculator typically requires input data such as production hours, downtime hours, produced goods, defective goods, and the ideal cycle time.
+            The **Overall Equipment Effectiveness (OEE)** calculator measures the efficiency and productivity of equipment. The input datasets and output visuals are as explained below:
 
-       **Availability**⏱️: Availability represents the percentage of time an equipment remains fully operational and ready to uses, excluding downtime.
+            **Input** : 
+                
+            1. Production dataset consisting of : Date of production, Equipment ID, Hours of Operation, Units of Goods produced, Count of Defective products, Time to produce one unit.
+        
+            2. Equipment Downtime dataset consisting of : Date of downtime, Equipment ID, Downtime in Hours, Downtime Reason.
+            
+                :gray [Using custom Data: ({download_link}) to download excel templates with sample data. You may add/modify data into each of the excel template, save and upload to view the visuals per the uploaded data]
 
-       **Performance**⚙️: Performance represents the ratio of the actual quantity produced to the planned quantity, indicating how well equipment meets its production targets.
+            **Output** :
 
-       **Quality**✔️: Quality represents the percentage of good units produced out of the total units produced, indicating production efficiency. 
+            Percent of equipment  **Availability**⏱️:, its **Performance**⚙️, produce **Quality**✔️ and finally its **OEE**.
 
-       This Calculator will need Production Hours Data, Downtime Hours Data dataset as detailed below along with attributes explained. 
-       This data can be loaded using excel files({download_link} to download excel templates and sample data). You may add corresponding data into each of the excel template, save and upload to view the visuals per the uploaded data.
-       
-       To start with we have few samples for each of the required inputs (Production Hours Data, Downtime Hours Data), using which the visuals below are displayed.  You may use the Equipmnet ID filter in the LEFT pane to view filtered visuals.
-  
-        **Sample Data Tables:** Below are sample tables for each type of data: 
+            **Samples Input datasets**:
         """,unsafe_allow_html=True)
       
         # Sample Data Tables
@@ -391,36 +392,11 @@ def main():
 
         col1, col2 = st.columns(2)
         with col1:
-          st.subheader('Sample Production Hours Data')
-          st.write("""
-**Date**: The  date on which the production activity took place. 
-
-**Id**: This is the unique identifier for the equipment or machinery.
-
-**ProductionHrs**: This indicates the number of hours the equipment was in operation during the specified date.
-
-**ProducedGoods**: This represents the total number of goods produced by the equipment during the specified date. 
-
-**DefectGoods**: This indicates the number of defective goods produced during the specified date.
-
-**IdealCycle**: This is the ideal or target cycle time for producing one unit of the product. 
-""")
           st.dataframe(sample_production_hours_data, height=250, use_container_width=True)
 
         with col2:
-          st.subheader('Sample Downtime Hours Data')
-          st.write(""" 
-**Date**: This is the specific date on which the downtime of the equipment was recorded.
-
-**Id**: This is the unique identifier for the equipment or production line experiencing downtime.
-
-**DownTimeHrs**: This represents the number of hours the equipment  was not operational due to downtime during the specified date.
-
-Downtime can be due to various reasons such as maintenance, equipment failure, or other disruptions.
-
-It is a critical metric for calculating the availability of the equipment.
-""")
           st.dataframe(sample_downtime_hours_data, height=250, use_container_width=True)
+
         st.markdown("<h2 style='text-align: center; color: black;'>Visuals genetated from the Sample data</h2>", unsafe_allow_html=True)
             
         if selected_id == 'All':

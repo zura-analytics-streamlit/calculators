@@ -16,6 +16,8 @@ st.markdown('<style>div.block-container { padding-top: 3rem; background-color: #
 # Define session state keys
 if 'upload_mode' not in st.session_state:
     st.session_state.upload_mode = False
+if 'show_visuals' not in st.session_state:
+    st.session_state.show_visuals = False
 
 if 'uploaded_files' not in st.session_state:
     st.session_state.uploaded_files = {
@@ -93,11 +95,12 @@ def calculate_rul(mtbf_data, equipment_data):
 
 def main():
 
-    st.markdown("<h1 style='text-align: center; color: green;'>Pump Maintenance and Performance Analyzer</h1>", unsafe_allow_html=True) 
+    st.markdown("<h2 style='text-align: center; color: green;'>Pump Maintenance and Performance Analyzer</h2>", unsafe_allow_html=True) 
 
     if st.session_state.upload_mode:
         # File upload mode
-        with st.sidebar.expander("Upload your files"):
+        with st.sidebar.expander("Please upload all required custom data files."): 
+
             operating_file = st.file_uploader("Operating Data", type=["xlsx"])
             vibration_file = st.file_uploader("Vibration Data", type=["xlsx"])
             maintenance_file = st.file_uploader("Maintenance History", type=["xlsx"])
@@ -120,7 +123,8 @@ def main():
             maintenance_data = pd.read_excel(uploaded_files['maintenance_data'])
             equipment_data = pd.read_excel(uploaded_files['equipment_data'])
 
-            st.header('Uploaded Data')
+            #st.header('Uploaded Data')
+            st.markdown("<h4 style='text-align: center; color: blue;'>[[Custom Data]]</h4>", unsafe_allow_html=True) 
             col1, col2 = st.columns(2)
 
             with col1:
@@ -137,11 +141,16 @@ def main():
                 st.subheader('Equipment Data')
                 st.dataframe(equipment_data)
 
-                #st.write("---")
+            st.markdown("<h2 style='text-align: center; color: black;'>Visuals genetated with Custom data</h2>", unsafe_allow_html=True)
+            sidebar_fraction = 0.3  # Adjust the fraction as needed, e.g., 0.3 means 30% of the total width
 
-            # Sidebar for filters
-            st.sidebar.subheader('Filter Data by RUL (%)')
-            rul_percentage = st.sidebar.slider('Select RUL (%)', min_value=0, max_value=100, value=0)
+            # Layout using st.sidebar and st
+            st.subheader('Filter Data by RUL (%)and PumpID')
+
+            # Use st for the main content area
+            col1, col2 = st.columns([sidebar_fraction, 1 - sidebar_fraction])  # Adjust as needed
+            with col1:
+                rul_percentage = st.slider('Select RUL (%)', min_value=0, max_value=100, value=0)
 
             # Calculate MTBF and RUL based on uploaded data
             mtbf_data = calculate_mtbf(operating_data, maintenance_data)
@@ -149,15 +158,15 @@ def main():
 
             filtered_mtbf_data = mtbf_data[mtbf_data['RUL (%)'] >= rul_percentage]
 
-            st.sidebar.header('Filter  by Pump ID')
-            pump_id_options = ['All'] + filtered_mtbf_data['PumpID'].unique().tolist()
-            selected_pump_id = st.sidebar.selectbox('Select Pump ID', pump_id_options)
+            #st.header('Filter by Pump ID')
+
+            with col1:
+                pump_id_options = ['All'] + filtered_mtbf_data['PumpID'].unique().tolist()
+                selected_pump_id = st.selectbox('Select Pump ID', pump_id_options)
 
             if selected_pump_id != 'All':
                 filtered_mtbf_data = filtered_mtbf_data[filtered_mtbf_data['PumpID'] == selected_pump_id]
                 filtered_operating_data = operating_data[operating_data['PumpID'] == selected_pump_id]
-
-            st.markdown("<h2 style='text-align: center; color: black;'>Visuals genetated from uploaded data</h2>", unsafe_allow_html=True)
 
             # Narrative section
             if selected_pump_id == 'All':
@@ -173,25 +182,25 @@ def main():
                 - The average <span style='color: blue;'>RUL (%)</span> is <span style='color: blue; font-weight: bold;'>{:.2f}%</span>.
                 """.format(selected_pump_id, selected_pump_id, filtered_operating_data['Operating Hours'].mean(), filtered_mtbf_data['RUL (%)'].mean()), unsafe_allow_html=True)
 
-            #st.write("---")
-
             # Visualizations based on uploaded data
             col1, col2 = st.columns([1, 1])
 
             with col1:
                 if 'Date' in operating_data.columns:
+                    st.subheader('Average MTBF Over Time')
                     filtered_operating_data = operating_data[operating_data['PumpID'].isin(filtered_mtbf_data['PumpID'])]
                     avg_operating_data = filtered_operating_data.groupby('Date')['Operating Hours'].mean().reset_index()
                     fig = px.line(avg_operating_data, x='Date', y='Operating Hours')
-                    fig.update_layout(title='Average MBTF Over Time', xaxis_title='Date', yaxis_title='Operating Hours')
+                    fig.update_layout(title='', xaxis_title='Date', yaxis_title='Operating Hours',width=350, height=350)
                     st.plotly_chart(fig)
 
             with col2:
                 if 'Date' in vibration_data.columns:
+                    st.subheader('Average Vibration Levels Over Time')
                     filtered_vibration_data = vibration_data[vibration_data['PumpID'].isin(filtered_mtbf_data['PumpID'])]
                     avg_vibration_data = filtered_vibration_data.groupby('Date')['Vibration Level (mm/s)'].mean().reset_index()
                     fig = px.line(avg_vibration_data, x='Date', y='Vibration Level (mm/s)')
-                    fig.update_layout(title='Average Vibration Levels Over Time', xaxis_title='Date', yaxis_title='Vibration Level (mm/s)')
+                    fig.update_layout(title='', xaxis_title='Date', yaxis_title='Vibration Level (mm/s)',width=350, height=350)
                     st.plotly_chart(fig)
 
             col3, col4 = st.columns([1, 1])
@@ -217,34 +226,29 @@ def main():
                 st.dataframe(filtered_mtbf_data.drop(columns=['Operating Hours', 'Number of Failures', 'MTBF (Hours)']))
 
         else:
-            st.warning('Please upload all required files.')
+            st.warning('Please upload all required custom data files.')
 
     else:
-        # Show description and sample data
-        #st.subheader('Pump Maintenance and Performance Analyzer')
-        
         # Description of the Pump Maintenance Calculator
         download_link = download_sample_data()
 
-        st.markdown(f"""
-        The Pump Maintenance Calculator is designed to analyze and visualize pump performance and maintenance. It provides insights into Mean Time Between Failures (MTBF) and estimates the Remaining Useful Life (RUL) of pumps based on historical data and sensor readings.
+        st.markdown(f""" 
+            The **Pump Maintenance Calculator** helps visualize pump performance and maintenance with insights into Mean Time Between Failures (**MTBF**) and Remaining Useful Life (**RUL**). The input datasets and output visuals are as explained below:\n
+            **Input**:  
+            1. Equipment/Pump data : list of equipment or pump information having Pump ID, Date of Mfg, Date of Expiry\n
+            2. Pump Operations dataset consisting of : Pump ID, Date of operation, and Hours of operation \n
+            3. Pump Maintenance History consisting of : Pump ID, Date of Failure, Maintenance Done \n
+            4. Pump Vibrations dataset (collected via sensors) : Pump ID, Date/Time, Vibration Level (mm/sec)\n  
+            **Output**:\n
+            1. Trend showing MTBF and Vibrations  \n
+            2. RUL guage and detail     \n
+            """, unsafe_allow_html=True)
 
-        This Calculator will need Pump Operations, Vibrations, Maintenance history and Equipment dataset as detailed below along with attributes explained. This data can be loaded using excel files ({download_link} to download excel templates and sample data). You may add corresponding data into each of the excel template, save and upload to view the visuals per the uploaded data.
-
-        To start with we have few samples for each of the required inputs (Operations, Vibrations, Maintenace and Equipment), using which the visuals below are displayed.  You may use the RUL slider and Pump ID filter in the LEFT pane to view filtered visuals.
-        """, unsafe_allow_html=True)
+        st.markdown("<h4 style='text-align: center; color: black;'>Sample datasets</h4>", unsafe_allow_html=True)
 
         col1, col2 = st.columns(2)
-        with col1:
+        with col2:
             st.subheader('Pump Operations')
-            
-            st.markdown("""
-            This table contains operating data for pumps, illustrating:
-
-            - **PumpID**: A unique identifier for each pump, crucial for distinguishing between different pumps in the system.
-            - **Date**: Records the date when operating hours were logged, essential for tracking pump usage over time.
-            - **Operating Hours**: Quantifies the number of hours each pump operated on specific dates, providing insights into usage patterns and workload.
-            """)
             sample_operating_data = pd.DataFrame({
                 'PumpID': [1, 1, 2, 2],
                 'Date': ['2024-06-01', '2024-06-02', '2024-06-03', '2024-06-04'],
@@ -253,13 +257,6 @@ def main():
             st.dataframe(sample_operating_data)
 
             st.subheader('Pump Vibrations')
-            st.markdown("""
-            This table showcases vibration data collected from pump sensors, including:
-
-            - **PumpID**: Identifies the pump associated with each vibration measurement.
-            - **Date**: Timestamps when vibration levels were recorded, providing a view of vibration trends.
-            - **Vibration Level (mm/s)**: Quantifies the intensity of vibration in millimeters per second (mm/s), indicating the mechanical stress and potential anomalies within the pump.
-            """)
             sample_vibration_data = pd.DataFrame({
                 'PumpID': [1, 1, 2, 2],
                 'Date': ['2024-06-01 08:00:00', '2024-06-02 08:00:00', '2024-06-01 08:00:00', '2024-06-02 08:00:00'],
@@ -267,125 +264,110 @@ def main():
             })
             st.dataframe(sample_vibration_data)
 
-        with col2:
-            st.subheader('Pump Maintenance History')
-            st.markdown("""
-            This table outlines sample maintenance activities conducted on pumps, detailing:
+        with col1:
+            st.subheader('Equipment/Pumps')
+            sample_equipment_data = pd.DataFrame({
+                'PumpID': [1, 2, 3, 4],
+                'ManufactureDate': ['2005-01-01', '2016-06-15', '1939-12-30', '1940-11-04'],
+                'ExpireDate': ['2025-01-01', '2026-06-15', '1998-04-05','2001-12-15']
+            })
+            st.dataframe(sample_equipment_data)
 
-            - **PumpID**: A unique identifier linking each maintenance record to the respective pump.
-            - **Failure Date**: The date when maintenance was performed in response to a reported issue or failure, critical for understanding the frequency and nature of pump failures.
-            - **Description**: Describes the specific maintenance tasks carried out (e.g., 'Change oil', 'Replace bearings'), clarifying the types of interventions undertaken to ensure pump reliability.
-            """)
+            st.subheader('Pump Maintenance History')
             sample_maintenance_data = pd.DataFrame({
                 'PumpID': [1, 1, 2, 2],
                 'Failure Date': ['2024-06-01', '2024-06-02', '2024-06-01', '2024-06-02'],
                 'Description': ['Change oil', 'Replace bearings', 'Clean filters', 'Inspect seals']
             })
             st.dataframe(sample_maintenance_data)
+        if st.button('Generate Visuals with above Sample data'):
+                st.session_state.show_visuals = True
+                st.session_state.upload_mode = False
 
-            st.subheader('Equipment/Pumps')
-            st.markdown("""
-            This table presents sample information about pump equipment, including:
+        if st.session_state.show_visuals:
+            st.markdown("<h3 style='text-align: center; color: Blue;'>Visuals genetated from above sample data</h3>", unsafe_allow_html=True)
 
-            - **PumpID**: Unique identifiers linking equipment details to specific pumps.
-            - **ManufactureDate**: Indicates the date when each pump was manufactured, crucial for assessing equipment age.
-            - **ExpireDate**: Specifies the anticipated expiry date or end of service life for each pump, guiding maintenance scheduling and replacement decisions.
-            """)
-            sample_equipment_data = pd.DataFrame({
-                'PumpID': [1, 2],
-                'ManufactureDate': ['2005-01-01', '2016-06-15'],
-                'ExpireDate': ['2025-01-01', '2026-06-15']
-            })
-            st.dataframe(sample_equipment_data)
-        st.markdown("<h2 style='text-align: center; color: black;'>Visuals genetated from above sample data</h2>", unsafe_allow_html=True)
+            st.subheader("Filter Data by RUL (%) and PumpID")
 
-        # Sidebar for filters
-        st.sidebar.subheader('***Filter Data by RUL (%)***')
-        rul_percentage = st.sidebar.slider('Select RUL (%)', min_value=0, max_value=100, value=0)
+            col1, col2 = st.columns([1, 3])  # Adjust as needed
+            with col1:
+                rul_percentage = st.slider('Select RUL (%)', min_value=0, max_value=100, value=0)
 
-        # Calculate MTBF and RUL based on sample data
-        mtbf_data = calculate_mtbf(sample_operating_data, sample_maintenance_data)
-        mtbf_data = calculate_rul(mtbf_data, sample_equipment_data)
+            # Calculate MTBF and RUL based on sample data
+            mtbf_data = calculate_mtbf(sample_operating_data, sample_maintenance_data)
+            mtbf_data = calculate_rul(mtbf_data, sample_equipment_data)
 
-        filtered_mtbf_data = mtbf_data[mtbf_data['RUL (%)'] >= rul_percentage]
+            filtered_mtbf_data = mtbf_data[mtbf_data['RUL (%)'] >= rul_percentage]
+            col1, col2 = st.columns([1, 3])
+            with col1:
+                #st.header('***Filter Results by Pump ID***')
+                pump_id_options = ['All'] + filtered_mtbf_data['PumpID'].unique().tolist()
+                selected_pump_id = st.selectbox('Select Pump ID', pump_id_options)
 
-        st.sidebar.header('***Filter Results by Pump ID***')
-        pump_id_options = ['All'] + filtered_mtbf_data['PumpID'].unique().tolist()
-        selected_pump_id = st.sidebar.selectbox('Select Pump ID', pump_id_options)
+            if selected_pump_id != 'All':
+                filtered_mtbf_data = filtered_mtbf_data[filtered_mtbf_data['PumpID'] == selected_pump_id]
+                filtered_operating_data = sample_operating_data[sample_operating_data['PumpID'] == selected_pump_id]
 
-        if selected_pump_id != 'All':
-            filtered_mtbf_data = filtered_mtbf_data[filtered_mtbf_data['PumpID'] == selected_pump_id]
-            filtered_operating_data = sample_operating_data[sample_operating_data['PumpID'] == selected_pump_id]
 
-        # Narrative section
-        if selected_pump_id == 'All':
+            # Generate visuals based on filtered sample data
+            col1, col2 = st.columns([1, 1])
 
-            st.markdown("""
-            ### Overall Pump Performance Overview:
-            - The average <span style='color: blue;'>Operating Hours</span> across all pumps is <span style='color: blue; font-weight: bold;'>{:.2f} hours</span>.
-            - The average <span style='color: blue;'>RUL (%)</span> across all pumps is <span style='color: blue; font-weight: bold;'>{:.2f}%</span>.
-            """.format(sample_operating_data['Operating Hours'].mean(), filtered_mtbf_data['RUL (%)'].mean()), unsafe_allow_html=True)
-        else:
-            st.markdown("""
-            ### Performance Overview for Pump ID {}:
-            - For Pump ID <span style='color: blue;'>{}</span>, the average <span style='color: blue;'>Operating Hours</span> is <span style='color: blue; font-weight: bold;'>{:.2f} hours</span>.
-            - The average <span style='color: blue;'>RUL (%)</span> is <span style='color: blue; font-weight: bold;'>{:.2f}%</span>.
-            """.format(selected_pump_id, selected_pump_id, filtered_operating_data['Operating Hours'].mean(), filtered_mtbf_data['RUL (%)'].mean()), unsafe_allow_html=True)
+            with col1:
+                if 'Date' in sample_operating_data.columns:
+                    st.subheader('Average MTBF Over Time')
+                    if 'PumpID' in filtered_mtbf_data.columns:
+                        filtered_operating_data = sample_operating_data[sample_operating_data['PumpID'].isin(filtered_mtbf_data['PumpID'])]
+                    avg_operating_data = filtered_operating_data.groupby('Date')['Operating Hours'].mean().reset_index()
+                    fig = px.line(avg_operating_data, x='Date', y='Operating Hours')
+                    fig.update_layout(title='', xaxis_title='Date', yaxis_title='Operating Hours')
+                    st.plotly_chart(fig)
 
-        #st.write("---")
-        sample_operating_data['Date'] = pd.to_datetime(sample_operating_data['Date']).dt.date
-        sample_vibration_data['Date'] = pd.to_datetime(sample_vibration_data['Date'])
-        # Visualizations based on sample data
-        col1, col2 = st.columns([1, 1])
+            with col2:
+                if 'Date' in sample_vibration_data.columns:
+                    st.subheader('Average Vibration Levels Over Time')
+                    if 'PumpID' in filtered_mtbf_data.columns:
+                        filtered_vibration_data = sample_vibration_data[sample_vibration_data['PumpID'].isin(filtered_mtbf_data['PumpID'])]
+                    avg_vibration_data = filtered_vibration_data.groupby('Date')['Vibration Level (mm/s)'].mean().reset_index()
+                    fig = px.line(avg_vibration_data, x='Date', y='Vibration Level (mm/s)')
+                    fig.update_layout(title='', xaxis_title='Date', yaxis_title='Vibration Level (mm/s)')
+                    st.plotly_chart(fig)
 
-        with col1:
-            if 'Date' in sample_operating_data.columns:
-                filtered_operating_data = sample_operating_data[sample_operating_data['PumpID'].isin(filtered_mtbf_data['PumpID'])]
-                avg_operating_data = filtered_operating_data.groupby('Date')['Operating Hours'].mean().reset_index()
-                fig = px.line(avg_operating_data, x='Date', y='Operating Hours')
-                fig.update_layout(title='Average MBTF Over Time', xaxis_title='Date', yaxis_title='Operating Hours')
+            col3, col4 = st.columns([1, 1])
+
+            with col3:
+                st.subheader('Estimated RUL (%)')
+                average_rul = filtered_mtbf_data['RUL (%)'].mean()
+                fig = go.Figure(go.Indicator(
+                    mode="gauge+number",
+                    value=average_rul,
+                    title={'text': "Average RUL (%)"}, 
+                    gauge={'axis': {'range': [0, 100]},
+                           'bar': {'color': "darkblue"},
+                           'steps': [
+                               {'range': [0, 50], 'color': "lightgray"},
+                               {'range': [50, 100], 'color': "gray"}]},
+                    number={'suffix': '%', 'valueformat': '.2f'}))
+                fig.update_layout(width=350, height=350)
                 st.plotly_chart(fig)
 
-        with col2:
-            if 'Date' in sample_vibration_data.columns:
-                filtered_vibration_data = sample_vibration_data[sample_vibration_data['PumpID'].isin(filtered_mtbf_data['PumpID'])]
-                avg_vibration_data = filtered_vibration_data.groupby('Date')['Vibration Level (mm/s)'].mean().reset_index()
-                fig = px.line(avg_vibration_data, x='Date', y='Vibration Level (mm/s)')
-                fig.update_layout(title='Average Vibration Levels Over Time', xaxis_title='Date', yaxis_title='Vibration Level (mm/s)')
-                st.plotly_chart(fig)
+            with col4:
+                st.subheader('Estimated RUL Details')
+                st.dataframe(filtered_mtbf_data.drop(columns=['Operating Hours', 'Number of Failures', 'MTBF (Hours)']))
 
-        col3, col4 = st.columns([1, 1])
+            st.markdown(f"""<h4>Want to try with custom data</h4>
+              [({download_link}) to download excel templates with sample data. You may add/modify data into each of the excel template, save and upload to view the visuals per the uploaded custom data]""", unsafe_allow_html=True) 
 
-        with col3:
-            st.subheader('Estimated RUL (%)')
-            average_rul = filtered_mtbf_data['RUL (%)'].mean()
-            fig = go.Figure(go.Indicator(
-                mode="gauge+number",
-                value=average_rul,
-                title={'text': "Average RUL (%)"}, 
-                gauge={'axis': {'range': [0, 100]},
-                       'bar': {'color': "darkblue"},
-                       'steps': [
-                           {'range': [0, 50], 'color': "lightgray"},
-                           {'range': [50, 100], 'color': "gray"}]},
-                number={'suffix': '%', 'valueformat': '.2f'}))
-            fig.update_layout(width=350, height=350)
-            st.plotly_chart(fig)
+    #if st.button('Show Visuals'):
+        #st.session_state.show_visuals = True
+        #st.session_state.upload_mode = False  # Ensure upload mode is off initially
 
-        with col4:
-            st.subheader('Estimated RUL Details')
-            st.dataframe(filtered_mtbf_data.drop(columns=['Operating Hours', 'Number of Failures', 'MTBF (Hours)']))
-
-        #st.write("---")
-        
-        #st.markdown("""**NOTE**: You can download the sample zip file and unzip the file and modify with your data and then you can click on Proceed to Upload Files""")
-        st.sidebar.write("---")
-        st.sidebar.header('***Want to try with your own data***')
-        st.sidebar.markdown(f"""{download_link} for excel templates""", unsafe_allow_html=True)
-
-        st.session_state.upload_mode = st.sidebar.button('Proceed to Upload Files')
-        if st.session_state.upload_mode:
-            st.session_state.uploaded_files = {'operating_data': None, 'vibration_data': None, 'maintenance_data': None, 'equipment_data': None}
+    # Enter Upload Mode button (only show if Show Visuals button was clicked)
+    if st.session_state.show_visuals:
+        if st.button('Upload custom data files'):
+            st.session_state.upload_mode = True
+            st.session_state.show_visuals = False
+            st.rerun()    # Turn off show visuals after entering upload mode
+    
 
 if __name__ == '__main__':
     main()
