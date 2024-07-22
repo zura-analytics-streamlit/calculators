@@ -10,6 +10,7 @@ from io import BytesIO
 st.set_page_config(layout="wide")
 st.markdown('<style>div.block-container { padding-top: 3rem; background-color: #E3F4F4; }</style>', unsafe_allow_html=True)
 
+
 # Define session state keys
 if 'upload_mode' not in st.session_state:
     st.session_state.upload_mode = False
@@ -68,7 +69,7 @@ def calculate_oee(production_hours_data, downtime_hours_data):
 # Function for sample mode
 def sample_mode():
     download_link = download_sample_data()
-    st.title('🔢Overall Equipment Effectiveness (OEE) Calculator')
+    st.title('🔢:blue[Overall Equipment Effectiveness (OEE) Calculator]')
     st.markdown(f"""
         The **Overall Equipment Effectiveness (OEE)** calculator measures the efficiency and productivity of equipment. The input datasets and output visuals are as explained below:\n
         **Input** : \n
@@ -97,13 +98,14 @@ def sample_mode():
 
     col1, col2 = st.columns(2)
     with col1:
-        st.dataframe(sample_production_hours_data, height=250, use_container_width=True)
+        st.dataframe(sample_production_hours_data, height=250, use_container_width=True,hide_index=True)
 
     with col2:
-        st.dataframe(sample_downtime_hours_data, height=250, use_container_width=True)
+        st.dataframe(sample_downtime_hours_data, height=250, use_container_width=True, hide_index=True)
 
     if st.button("Generate Visuals using Sample Data"):
         st.session_state.visuals_generated = True
+        st.session_state.upload_mode = False
 
     if st.session_state.visuals_generated:
         merged_data = pd.merge(sample_production_hours_data, sample_downtime_hours_data, on=['Date', 'EquipmentId'])
@@ -114,7 +116,7 @@ def sample_mode():
         merged_data['OEE'] = merged_data['Availability'] * merged_data['Performance'] * merged_data['Quality'] * 100
 
         # Filter results by ID
-        st.markdown("<h2 style='text-align: center; color: black;'>Visuals Generated from Sample Data </h2>", unsafe_allow_html=True)
+        st.markdown("<h2 style='text-align: center; color: #0768C9;'>Visuals Generated from Sample Data </h2>", unsafe_allow_html=True)
         col1,col2,col3=st.columns(3)
         with col1:
           available_ids = merged_data['EquipmentId'].unique().tolist()
@@ -200,12 +202,10 @@ def sample_mode():
              
         # Display results for each record in a table
         filtered_data_display = filtered_data[['Date', 'EquipmentId', 'Availability', 'Performance', 'Quality', 'OEE']]
-        filtered_data_display.loc[:, 'Availability'] = filtered_data_display['Availability'].astype(float)
-        filtered_data_display.loc[:,'Performance'] = filtered_data_display['Performance'].astype(float)
-        filtered_data_display.loc[:,'Quality'] = filtered_data_display['Quality'].astype(float)
-        filtered_data_display.loc[:,'OEE'] = filtered_data_display['OEE'].astype(float)
-
-
+        filtered_data_display.loc[:, 'Availability'] = filtered_data_display['Availability'].round(4)*100
+        filtered_data_display.loc[:, 'Performance'] = filtered_data_display['Performance'].round(4)*100
+        filtered_data_display.loc[:,'Quality'] = filtered_data_display['Quality'].round(4)*100  
+        filtered_data_display.loc[:,'OEE'] = filtered_data_display['OEE'].round(2)
 
         if selected_id == 'All':
                   
@@ -251,22 +251,25 @@ def sample_mode():
 
         col7,col8=st.columns(2)
         with col7:
-                st.write("**Equipment Metric Details**")
+                st.write("**Equipment Metric Percentage Details**")
                 
-                st.dataframe(filtered_data_display,height=280,use_container_width=True)
+                st.dataframe(filtered_data_display,height=280,use_container_width=True, hide_index=True)
         with col8:
                 st.write("**Average OEE of Each Equipment**")
-                st.dataframe(avg_oee_data,height=280,use_container_width=True)
+                st.dataframe(avg_oee_data,height=280,use_container_width=True, hide_index=True)
 
         st.markdown(f"""<h4>Want to try with custom data</h4>
-            [({download_link}) to download excel templates with sample data. You may add/modify data into each of the excel template, save and upload to view the visuals per the uploaded custom data]""", unsafe_allow_html=True) 
+            [({download_link}) to download excel templates with sample data. You may add/modify data into each of the excel template, save and upload to view the visuals as per the uploaded custom data]""", unsafe_allow_html=True) 
 
-        st.button("Upload custom data files")
-        st.session_state.upload_mode = True
+    if st.session_state.visuals_generated:
+       if st.button("Upload Custom data files"):
+           st.session_state.upload_mode = True
+           st.session_state.visuals_generated = False
+           st.rerun()
 
 # Function for upload mode
 def upload_mode():
-    st.title('🔢Overall Equipment Effectiveness (OEE) Calculator')
+    st.title('🔢:blue[Overall Equipment Effectiveness (OEE) Calculator]')
 
     with st.sidebar.expander("Upload Custom data Files"):
       production_file = st.file_uploader("Upload Production Data", type=["csv", "xlsx"])
@@ -289,16 +292,16 @@ def upload_mode():
         col1,col2=st.columns(2)
         with col1:
             st.write("**Uploaded Production Hours Data**")
-            st.dataframe(production_data, height=250, use_container_width=True)
+            st.dataframe(production_data, height=250, use_container_width=True,hide_index=True)
         with col2:
             st.write("**Uploaded Downtime Hours Data**")
-            st.dataframe(downtime_data, height=250, use_container_width=True)
+            st.dataframe(downtime_data, height=250, use_container_width=True,hide_index=True)
 
  
         merged_data = calculate_oee(production_data, downtime_data)
 
         # Filter results by ID
-        st.markdown("<h2 style='text-align: center; color: black;'>Visuals Generated from Custom Data </h2>", unsafe_allow_html=True)
+        st.markdown("<h2 style='text-align: center; color: #0768C9;'>Visuals Generated from Custom Data </h2>", unsafe_allow_html=True)
         col1,col2,col3=st.columns(3)
         with col1:
           #st.write('Filter Results by ID')
@@ -384,10 +387,10 @@ def upload_mode():
              
         # Display results for each record in a table
         filtered_data_display = filtered_data[['Date', 'EquipmentId', 'Availability', 'Performance', 'Quality', 'OEE']]
-        filtered_data_display.loc[:, 'Availability'] = filtered_data_display['Availability'].astype(float)
-        filtered_data_display.loc[:,'Performance'] = filtered_data_display['Performance'].astype(float)
-        filtered_data_display.loc[:,'Quality'] = filtered_data_display['Quality'].astype(float)
-        filtered_data_display.loc[:,'OEE'] = filtered_data_display['OEE'].astype(float)
+        filtered_data_display.loc[:, 'Availability'] = filtered_data_display['Availability'].round(4)*100 
+        filtered_data_display.loc[:,'Performance'] = filtered_data_display['Performance'].round(4)*100 
+        filtered_data_display.loc[:,'Quality'] = filtered_data_display['Quality'].round(4)*100 
+        filtered_data_display.loc[:,'OEE'] = filtered_data_display['OEE'].round(2)
        
         if selected_id == 'All':
                
@@ -431,12 +434,11 @@ def upload_mode():
 
         col7,col8=st.columns(2)
         with col7:
-                st.write("**Equipment Metric Details**")
-                
-                st.dataframe(filtered_data_display,height=280,use_container_width=True)
+                st.write("**Equipment Metric Percentage Details**")
+                st.dataframe(filtered_data_display,height=280,use_container_width=True,hide_index=True)
         with col8:
                 st.write("**Average OEE of Each Equipment**")
-                st.dataframe(avg_oee_data,height=280,use_container_width=True)
+                st.dataframe(avg_oee_data,height=280,use_container_width=True, hide_index=True)
 
 
 # Main logic to switch between modes
